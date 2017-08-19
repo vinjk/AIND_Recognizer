@@ -136,7 +136,7 @@ class SelectorDIC(ModelSelector):
                 # Compute score for other words and find average
                 for word in other_words:
                     X_word, lengths_word = self.hwords[word]
-                    score_other_words = score_other_words +model.score(X_word, lengths_word)
+                    score_other_words += model.score(X_word, lengths_word)
 
                 # DIC Score
                 score =  score_this_word - (score_other_words / (len(self.words) - 1))
@@ -167,13 +167,15 @@ class SelectorCV(ModelSelector):
         
         nstate_min = self.min_n_components
         nstate_max = self.max_n_components+1  #loop inclusive of max_n_components
-        total_score = 0.0
-        count = 0
         best_score = float("-inf")
         best_model = None
         flag_fulldatamodel = False
 
         for n in range(nstate_min, nstate_max):
+
+            total_score = 0.0
+            count = 0
+
             try:                
                 if len(self.sequences) > 2:
                     nsplit = min(len(self.sequences),3)
