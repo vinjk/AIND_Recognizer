@@ -75,6 +75,30 @@ class SelectorBIC(ModelSelector):
         :return: GaussianHMM object
         """
         warnings.filterwarnings("ignore", category=DeprecationWarning)
+        
+        nstate_min = self.min_n_components
+        nstate_max = self.max_n_components+1
+        best_score = float("inf")
+        best_model = None
+        
+        try:
+            for n in range(nstate_min,nstate_max):
+                model = self.base_model(n)
+                logL = model.score(self.X, self.lengths)
+                
+                d = model.n_features
+                p = n ** 2 + 2 * n * d - 1
+                
+                score = -2 *logL + p * math.log(n)
+                
+                if best_score > score:
+                    best_score = score
+                    best_model = model
+            
+        except:
+            pass
+        
+        return best_model
 
         # TODO implement model selection based on BIC scores
         raise NotImplementedError
@@ -91,6 +115,41 @@ class SelectorDIC(ModelSelector):
 
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
+        
+        nstate_min = self.min_n_components
+        nstate_max = self.max_n_components+1
+        best_score = float("-inf")
+        best_model = None
+        
+        
+        #other words list
+        other_words = list(self.words)
+        other_words.remove(self.this_word)
+
+        for n in range(nstate_min, nstate_max):
+            try:
+                model = self.base_model(n)
+                score_this_word = model.score(self.X, self.lengths)
+
+                score_other_words = 0.0
+
+                # Compute score for other words and find average
+                for word in other_words:
+                    X_word, lengths_word = self.hwords[word]
+                    score_other_words = score_other_words +model.score(X_word, lengths_word)
+
+                # DIC Score
+                score =  score_this_word - (score_other_words / (len(self.words) - 1))
+
+                # Find model woth highest DIC score
+                if best_score < score:
+                    best_score = score
+                    best_model = model
+            except:
+                    pass
+
+        return best_model
+        
 
         # TODO implement model selection based on DIC scores
         raise NotImplementedError
@@ -105,4 +164,51 @@ class SelectorCV(ModelSelector):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         # TODO implement model selection using CV
+        
+        nstate_min = self.min_n_components
+        nstate_max = self.max_n_components+1  #loop inclusive of max_n_components
+        total_score = 0.0
+        count = 0
+        best_score = float("-inf")
+        best_model = None
+        flag_fulldatamodel = False
+
+        for n in range(nstate_min, nstate_max):
+            try:                
+                if len(self.sequences) > 2:
+                    nsplit = min(len(self.sequences),3)
+                    split_method = KFold(shuffle=True, n_splits = nsplit)
+                    for cv_train_idx, cv_test_idx in split_method.split(self.sequences):
+                        X_train, lengths_train = combine_sequences(cv_train_idx, self.sequences)
+                        X_test, lengths_test = combine_sequences(cv_test_idx, self.sequences)
+    
+                        model = GaussianHMM(n_components=n, covariance_type="diag", n_iter=1000,
+                                            random_state=self.random_state, verbose = False).fit(X_train, lengths_train)
+                        logL = model.score(X_test, lengths_test)
+                        total_score = total_score+logL
+                        count += 1
+                    score = total_score/count
+                else:
+                    flag_fulldatamodel = True
+                    model = GaussianHMM(n_components=n, covariance_type="diag", n_iter=1000,
+                                        random_state=self.random_state, verbose = False).fit(self.X, self.lengths)
+                    score = model.score(self.X, self.lengths)
+                if best_score < score:
+                    best_score = score
+                    if not flag_fulldatamodel:
+                        best_model = GaussianHMM(n_components=n, covariance_type="diag", n_iter=1000, 
+                                                 random_state=self.random_state, verbose = False).fit(self.X, self.lengths)
+                    else:
+                        best_model = model
+    
+                flag_fulldatamodel = False
+                model = None
+            
+            except:
+                pass
+
+        return best_model
+
+
+
         raise NotImplementedError
