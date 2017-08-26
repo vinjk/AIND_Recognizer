@@ -177,7 +177,7 @@ class SelectorCV(ModelSelector):
             count = 0
 
             try:                
-                if len(self.sequences) > 2:
+                if len(self.sequences) >= 2:
                     nsplit = min(len(self.sequences),3)
                     split_method = KFold(shuffle=True, n_splits = nsplit)
                     for cv_train_idx, cv_test_idx in split_method.split(self.sequences):
